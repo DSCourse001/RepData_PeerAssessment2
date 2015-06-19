@@ -1,5 +1,5 @@
 ---
-title: 'Analisys of Weather Events in the United States (Reproducible Research: Peer Assessment 2)'
+title: 'Analysis of Weather Events in the United States (Reproducible Research: Peer Assessment 2)'
 author: "DSCourse001 User"
 date: "Friday, June 19, 2015"
 output: html_document
