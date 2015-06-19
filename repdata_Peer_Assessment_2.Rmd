@@ -1,0 +1,194 @@
+---
+title: 'Reproducible Research: Peer Assessment 2'
+author: "DSCourse001 User"
+date: "Friday, June 19, 2015"
+output: html_document
+---
+
+## Synopsis
+This document should answer on the following questions.
+
+1.  Across the United States, which types of events are most harmful with respect to population health?
+2.  Across the United States, which types of events have the greatest economic consequences?
+
+Data, that was used in calculations, can be obtained following [this link](https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2).
+
+The events in the database start in the year 1950 and end in November 2011. In the earlier years of the database there are generally fewer events recorded, most likely due to a lack of good records. More recent years should be considered more complete.
+
+There is also some documentation of the database available.
+
+1.  National Weather [Service Storm Data Documentation](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf)
+2.  National Climatic Data Center Storm Events [FAQ](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2FNCDC%20Storm%20Events-FAQ%20Page.pdf)
+
+## Data Processing
+Data came in csv file which is compressed in bz2 format. Unfortunately that file cannot be loaded using "fast" loading tools like ```fread``` because of End-Of-Line character used in remarks. 
+As we will see data is skewed and there should be done additional processing to make data understandable for machine language.
+
+After formatting the data we will produce few data sets with summary data to answer on question.
+
+1.  Loading data from bz2 archive
+
+First of all we need to load required R packages and setup document parameters.
+
+``` {r setup, echo=TRUE, cache=FALSE, include=TRUE, message=FALSE}
+require(knitr)
+require(data.table)
+require(dplyr)
+require(plyr)
+require(ggplot2)
+require(grid)
+require(gridExtra)
+
+opts_knit$set(root.dir = ".")
+opts_chunk$set(fig.path = "./figure/",dev="png")
+```
+
+Now we can load data from the internet.
+
+```{r readdata,cache=TRUE,echo=TRUE}
+## Reading csv file in bz2 archive and convert to data.table class
+url<-"https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
+bzfileName<-tempfile()
+download.file(url=url,destfile=bzfileName,method="wget",quiet=T,mode="wb",extra=c("--no-check-certificate"))
+
+data<-as.data.table(
+    read.csv(
+        bzfile<-bzfile(bzfileName,open="r")
+        ,stringsAsFactor=F,header=T
+        )
+    )
+
+close(bzfile)
+unlink(bzfileName)
+```
+
+2.  Processing data. Please read comments to R Code.
+
+``` {r preparedata,echo=TRUE,message=FALSE}
+## Getting Event Type, Time, Country Name and State,
+## Fatalities and Injuries of people,
+## Damage for Property and Crop
+data<-data[,list(EVTYPE
+                 ,COUNTYNAME,STATE
+                 ,FATALITIES,INJURIES
+                 ,PROPDMG,PROPDMGEXP,CROPDMG,CROPDMGEXP
+                 )]
+
+## Let walk through the data
+table(is.na(data))
+
+## There is some problem with Event Type
+length(unique(data$EVTYPE))
+length(unique(toupper(data$EVTYPE)))
+
+## Multiplication Factor for Property and Crop Damage came in different format
+## For Property Damage
+sort(unique(data$PROPDMGEXP))
+
+## For Crop Damage
+sort(unique(data$CROPDMGEXP))
+
+## Let Assign Data
+## Re-assign data to avoid output
+data<-data[,`:=` (
+PROPDMG=as.numeric(mapvalues(toupper(PROPDMGEXP),
+c("","-","?","+","0","1","2","3","4","5","6","7","8","9","H","K","M","B"),
+c(rep(1,5),1e1,1e2,1e3,1e4,1e5,1e6,1e7,1e8,1e9,1e2,1e3,1e6,1e9)
+)) * PROPDMG,
+CROPDMG=as.numeric(mapvalues(toupper(CROPDMGEXP),
+c("","-","?","+","0","1","2","3","4","5","6","7","8","9","H","K","M","B"),
+c(rep(1,5),1e1,1e2,1e3,1e4,1e5,1e6,1e7,1e8,1e9,1e2,1e3,1e6,1e9)
+)) * CROPDMG,
+PROPDMGEXP=NULL,CROPDMGEXP=NULL
+)]
+
+## Total Damage
+data<-data[,TOTALDMG:=PROPDMG+CROPDMG]
+
+## Event Type
+data<-data[,EVTYPE:=toupper(EVTYPE)]
+
+## Translate Column Names to Lower Case
+setnames(data,tolower(names(data)))
+
+## Now Data is ready to processing
+str(data)
+
+## Before Plot we would like to create few data sets for summary data
+dataGroup <- data %>%
+                group_by(evtype) %>%
+                    summarise_each(funs(sum)
+                                   ,fatalities,injuries
+                                   ,propdmg,cropdmg,totaldmg)
+
+## And let us take few marks
+fatalitiesMost<-arrange(dataGroup,-fatalities)$evtype[1]
+injuriesMost<-arrange(dataGroup,-injuries)$evtype[1]
+propdmgMost<-arrange(dataGroup,-propdmg)$evtype[1]
+cropdmgMost<-arrange(dataGroup,-cropdmg)$evtype[1]
+totaldmgMost<-arrange(dataGroup,-totaldmg)$evtype[1]
+```
+
+## Results
+
+Results are visualized on graphs. 
+
+1.  We can see that **`r injuriesMost`** caused the most injuries, and **`r fatalitiesMost`** is the most harmful with respect to population health. 
+
+2.  **`r propdmgMost`** caused the most damage to property, **`r cropdmgMost`** caused the most damage to crop. But the **`r totaldmgMost`** Caused the most damage with respect to property and crop damage totally.
+
+### Top 5 Events by fatalities and injuries.
+
+``` {r plot1,echo=TRUE}
+plot1<-ggplot(
+  data=head(plyr::arrange(dataGroup,-fatalities),5),
+  aes(x=reorder(evtype,fatalities),y=fatalities,fill=evtype)) +
+  geom_bar(stat="identity") +
+  coord_flip() +
+  theme(legend.position="none") +
+  labs(x="")
+
+plot2<-ggplot(
+  data=head(arrange(dataGroup,-injuries),5),
+  aes(x=reorder(evtype,injuries),y=injuries,fill=evtype)) +
+  geom_bar(stat="identity") +
+  coord_flip() +
+  theme(legend.position="none") +
+  labs(x="")
+
+grid.arrange(plot1,plot2,ncol=2)
+```
+
+### Top 5 Events by Damage to Property and Corp
+
+``` {r plot2,echo=TRUE}
+plot1<-ggplot(
+  data=head(arrange(dataGroup,-propdmg),5),
+  aes(x=reorder(evtype,propdmg),y=propdmg,fill=evtype)) +
+  geom_bar(stat="identity") + 
+  coord_flip() +
+  theme(legend.position="none") +
+  labs(x="",y="Property Damage, USD")
+
+plot2<-ggplot(
+  data=head(arrange(dataGroup,-cropdmg),5),
+  aes(x=reorder(evtype,cropdmg),y=cropdmg,fill=evtype)) +
+  geom_bar(stat="identity") +
+  coord_flip() + 
+  theme(legend.position="none") +
+  labs(x="",y="Crop Damage, USD")
+
+plot3<-ggplot(
+  data=head(arrange(dataGroup,-totaldmg),5),
+  aes(x=reorder(evtype,totaldmg),y=totaldmg,fill=evtype)) +
+  geom_bar(stat="identity") +
+  coord_flip() +
+  theme(legend.position="none") +
+  labs(x="",y="Total Damage, USD")
+
+grid.arrange(plot1,plot2,plot3,nrow=3)
+```
+
+## Conclusion
+
+We have cleared up initial data and prepare for plotting. After that we have drown plots that answers on question in the beginning of this investigation.
