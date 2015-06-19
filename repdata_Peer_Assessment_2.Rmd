@@ -1,5 +1,5 @@
 ---
-title: 'Reproducible Research: Peer Assessment 2'
+title: 'Analisys of Weather Events in the United States (Reproducible Research: Peer Assessment 2)'
 author: "DSCourse001 User"
 date: "Friday, June 19, 2015"
 output: html_document
@@ -21,10 +21,19 @@ There is also some documentation of the database available.
 2.  National Climatic Data Center Storm Events [FAQ](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2FNCDC%20Storm%20Events-FAQ%20Page.pdf)
 
 ## Data Processing
-Data came in csv file which is compressed in bz2 format. Unfortunately that file cannot be loaded using "fast" loading tools like ```fread``` because of End-Of-Line character used in remarks. 
-As we will see data is skewed and there should be done additional processing to make data understandable for machine language.
+Data came in csv file which is compressed in bz2 format. Unfortunately that file cannot be loaded using "fast" loading tools like ```fread``` because of End-Of-Line character used in remarks. We can say that we need only few columns from the original data set. Additionally As we will see data is skewed and there should be done additional processing to make data understandable for machine language.
 
-After formatting the data we will produce few data sets with summary data to answer on question.
+Columns that we need:
+
+* EVTYPE - Type of weather event
+* FATALITIES - Number of fatalities that this event cause
+* INJURIES - Number of injuries that this event cause
+* PROPDMG - Damage of property that this event cause
+* PROPDMGEXP - Multiplication factor for PROPDMG
+* CROPDMG - Damage of crop that this event cause
+* CROPDMGEXP - Multiplication factor for CROPDMG
+
+After formatting the data we will produce new data set with sammary which one we will use to plot the data.
 
 1.  Loading data from bz2 archive
 
@@ -69,7 +78,6 @@ unlink(bzfileName)
 ## Fatalities and Injuries of people,
 ## Damage for Property and Crop
 data<-data[,list(EVTYPE
-                 ,COUNTYNAME,STATE
                  ,FATALITIES,INJURIES
                  ,PROPDMG,PROPDMGEXP,CROPDMG,CROPDMGEXP
                  )]
@@ -156,10 +164,10 @@ plot2<-ggplot(
   theme(legend.position="none") +
   labs(x="")
 
-grid.arrange(plot1,plot2,ncol=2)
+grid.arrange(plot1,plot2,ncol=2,main="Top Five Weather Events by fatalities and injuries")
 ```
 
-### Top 5 Events by Damage to Property and Corp
+### Top 5 Events by Damage to Property and Crop
 
 ``` {r plot2,echo=TRUE}
 plot1<-ggplot(
@@ -186,7 +194,7 @@ plot3<-ggplot(
   theme(legend.position="none") +
   labs(x="",y="Total Damage, USD")
 
-grid.arrange(plot1,plot2,plot3,nrow=3)
+grid.arrange(plot3,plot1,plot2,nrow=3,main="Top Five Weather Events by Damage to Property and Crop")
 ```
 
 ## Conclusion
